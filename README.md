@@ -1,0 +1,3 @@
+# Strength
+
+Playing with purescript 
