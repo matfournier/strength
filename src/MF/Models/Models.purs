@@ -3,16 +3,14 @@ module Models where
 import Prelude
 import Data.Array (range)
 import Data.Int (toNumber)
-import Math (tan)
-import Degree (Deg, deg2rad) 
+import Math (tan, asin, pow, sqrt)
+import Degree (Deg, deg2rad, rad2deg, num2deg)
 
 -- | Generic aliasing
 
 type UCS = Number -- Unconfined Compressive Strength 
 type GSI = Number -- GS 
 type ModelName = String
-
-
 
 -- | Models
 -- | In the form Paramters, the Model itself, and a Sum type of Models
@@ -41,13 +39,25 @@ newtype HoekBrownModel = HoekBrownModel { inputs :: HoekBrown
                                         , rockmassUCS :: Number
                                         , rockMassTensileStrength :: Number }
 
+hoekBrownToMohrColoumb :: HoekBrownModel -> Number -> MohrColoumbModel
+hoekBrownToMohrColoumb (HoekBrownModel hb) sig3max = MohrColoumbModel {phi: rad2deg p, cohesion: c}
+  where
+    sig3n = sig3max / hb.ucs
+    p = asin (6.0 * hb.a * hb.mb * pow (hb.s + hb.mb * sig3n)(hb.a - 1.0) /
+        ((2.0 * (1.0 + hb.a) * (2.0 + hb.a)) + (6.0 * hb.a * hb.mb * pow (hb.s + hb.mb * sig3n)(hb.a - 1.0))))
+    c =  (hb.inputs.ucs * (((1.0 + 2.0 * hb.a) * hb.s) + ((1.0 - hb.a) * hb.mb * sig3n)) *
+          pow (hb.s + hb.mb * sig3n)(hb.a - 1.0)) / (((1.0 + hb.a) * (2.0 + hb.a)) *
+          sqrt(1.0 + (((6.0 * hb.a * hb.mb) * pow(hb.s + hb.mb * sig3n)(hb.a - 1.0))) /
+               ((1.0 + hb.a) * (2.0 + hb.a))))
+
+
 -- | Sum type of all models 
 data Model = MC ModelName MohrColoumbModel
             | Frictional ModelName FrictionalStrengthModel
             | HB ModelName HoekBrownModel
             | SN ModelName ShearNormalModel 
 
--- | Prebuild models
+-- | Prebuild static Leps (1970) soil models models
 
 lepsPoor :: Model 
 lepsPoor = SN "Leps - Poor" leps
