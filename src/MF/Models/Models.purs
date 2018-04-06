@@ -156,9 +156,15 @@ hbSigma1' (HoekBrownModel hb) sig3' =
       sig3' + hb.inputs.ucs * pow((hb.mb * sig3' / hb.inputs.ucs) + hb.s)(hb.a)
 
 
--- need to rethink this one, it doesn't have all the inputs? where do I get rockmass compressive strength
--- from? 
 -- calculate d'sigma1' / d'sigma3'
--- ds1ds3 :: HoekBrownModel -> Number -> Number -> Number
--- ds1ds3 hb s1 s3 = 1 + (hb.a * hb.mb * pow ((hb.mb * s3)/(hb.)))
-    
+ds1ds3 :: HoekBrownModel -> Number -> Number -> Number
+ds1ds3 (HoekBrownModel hb) s1 s3 = 1.0 +
+                                   (hb.a * hb.mb * pow ((hb.mb * s3)/(hb.rockmassUCS + hb.s)) (hb.a - 1.0))
+
+-- calculate  sigma normal'
+hbNormal' :: Number -> Number -> Number -> Number
+hbNormal' s1' s3' ds1ds3 = ((s1' + s3') / 2.0) + ((s1' - s3') / 2.0) * ((ds1ds3 - 1.0) / (ds1ds3 + 1.0))
+
+-- calculate tau shear stress
+hbTau :: Number -> Number -> Number -> Number
+hbTau s1' s3' ds1ds3 = (s1' - s3') * sqrt(ds1ds3) / (ds1ds3 + 1.0)
