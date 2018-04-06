@@ -1,10 +1,11 @@
 module Models where
 
 import Prelude
+
 import Data.Array (range)
 import Data.Int (toNumber)
-import Math (tan, asin, pow, sqrt)
 import Degree (Deg, deg2rad, rad2deg, num2deg)
+import Math (tan, asin, pow, sqrt, exp, e)
 
 -- | Generic aliasing
 
@@ -42,7 +43,7 @@ newtype HoekBrownModel = HoekBrownModel { inputs :: HoekBrown
 hoekBrownToMohrColoumb :: HoekBrownModel -> Number -> MohrColoumbModel
 hoekBrownToMohrColoumb (HoekBrownModel hb) sig3max = MohrColoumbModel {phi: rad2deg p, cohesion: c}
   where
-    sig3n = sig3max / hb.ucs
+    sig3n = sig3max / hb.inputs.ucs
     p = asin (6.0 * hb.a * hb.mb * pow (hb.s + hb.mb * sig3n)(hb.a - 1.0) /
         ((2.0 * (1.0 + hb.a) * (2.0 + hb.a)) + (6.0 * hb.a * hb.mb * pow (hb.s + hb.mb * sig3n)(hb.a - 1.0))))
     c =  (hb.inputs.ucs * (((1.0 + 2.0 * hb.a) * hb.s) + ((1.0 - hb.a) * hb.mb * sig3n)) *
@@ -86,20 +87,26 @@ lepsGood = SN "Leps - Good" leps
       shearStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
       normalStress: [6.5, 36.4, 58.9, 109.3, 321.1, 530.5, 730.6, 1114.1, 4189.7, 5763.8] 
       }
-    
+
+-- | Model Parameter Types
+
+newtype ShearNormalParameters = ShearNormalParameters {min :: Number, max :: Number, granularity :: Int}
+
+
 -- | Typeclasses 
 
 -- | Convert from model (a) with range b c to a ShearNormalModel
 -- |   so all models can be plotted as shear vs normal stress
 
-class ShearNormal a b c where
-  shearnormal :: a -> b -> c -> ShearNormalModel
+class ShearNormal model settings  where
+  shearnormal :: model -> settings -> ShearNormalModel
 
-instance mcShearNormal :: ShearNormal MohrColoumbModel Number Number where
-  shearnormal (MohrColoumbModel mc) min max = ShearNormalModel {shearStress: ss, normalStress: ns} 
+instance mcShearNormal :: ShearNormal MohrColoumbModel ShearNormalParameters where
+  shearnormal (MohrColoumbModel mc) (ShearNormalParameters params) =
+    ShearNormalModel {shearStress: ss, normalStress: ns} 
     where
       ss :: Array Number 
-      ss = normalStressRange min max 40
+      ss = normalStressRange params.min params.max params.granularity
       ns :: Array Number 
       ns = map (\s -> tan(deg2rad(mc.phi)) + mc.cohesion) ss  
 
@@ -109,3 +116,49 @@ normalStressRange :: Number -> Number -> Int -> Array Number
 normalStressRange min max granularity =
   let rangeStep =(max - min) / toNumber(granularity)
       in map (\v -> min + (toNumber(v) * rangeStep)) $ range 1 granularity
+
+-- instance hbShearNormal :: ShearNormal HoekBrownModel ShearNormalParameters where
+--   shearnormal (HoekBrownModel hb) (ShearNormalParameters params) = ShearNormalModel {shearStress: ss, nomralStress: ns}
+--     where
+--       tensileRange :: Array Number
+--       tensileRange = normalStressRange (-hb.rockMassTensileStrength) 0 30
+--       s3range = normalStressRange params.min params.max params.granularity
+--       s1 = map (\s3 -> s3 + hb.ucs * pow((hb.mb * s3 / hb.inputs.ucs) + hb.s)(hb.a)) s3range 
+--       ds1s3 = map (\s3 -> 1 + (hb.a * hb.mb * pow((hb.mb * hb * s3 / hb.inputs.ucs) + hb.s)(hb.a - 1.0))) s3range
+--      -- I need a zipWith3 here but it's not defined on arrays?
+
+
+-- calculate the reduced value of the material constant mi 
+mb :: HoekBrown -> Number
+mb hb = hb.mi * exp ((hb.gsi - 100.0) / (28.0 - 14.0 * hb.d))
+
+-- calculate s rock mass constant
+s :: HoekBrown -> Number
+s hb = exp ((hb.gsi - 100.0) / (9.0 - 3.0 * hb.d))
+
+-- calculate a rock mass constant
+a :: HoekBrown -> Number
+a hb = 0.5 + (1.0 / 6.0) * (pow e (-hb.gsi / 15.0) ) - (pow e (-20.0 / 3.0))
+
+-- calculate uniaxial compressive strength
+ucs' :: HoekBrown -> Number -> Number -> Number
+ucs' hb s a = hb.ucs * pow s a 
+
+-- calculate sneile strength
+
+t' :: HoekBrown -> Number -> Number -> Number
+t' hb s mb = s * hb.ucs / mb
+
+
+-- calculated sigma1' 
+hbSigma1' :: HoekBrownModel -> Number -> Number
+hbSigma1' (HoekBrownModel hb) sig3' =
+      sig3' + hb.inputs.ucs * pow((hb.mb * sig3' / hb.inputs.ucs) + hb.s)(hb.a)
+
+
+-- need to rethink this one, it doesn't have all the inputs? where do I get rockmass compressive strength
+-- from? 
+-- calculate d'sigma1' / d'sigma3'
+-- ds1ds3 :: HoekBrownModel -> Number -> Number -> Number
+-- ds1ds3 hb s1 s3 = 1 + (hb.a * hb.mb * pow ((hb.mb * s3)/(hb.)))
+    

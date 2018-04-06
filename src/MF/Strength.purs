@@ -28,6 +28,8 @@ showBlahModel (MC name mc) = name <> " " <> showMC mc
 showBlahModel (SN name shear) = name <> " " <> showSN shear
 showBlahModel _ = "not here yet!"
 
-generateAxis :: Model -> ShearNormalModel
-generateAxis (MC _ mc) = shearnormal mc 0.0 1000.0
-generateAxis _ =  ShearNormalModel {shearStress: [1.0,2.0], normalStress:[1.0, 2.0]} -- todo generate the rest here
+
+-- need to update w/ the new params methods 
+-- generateAxis :: Model -> ShearNormalModel
+-- generateAxis (MC _ mc) = shearnormal mc ShearNormalParameters {min: 0.0, max: 1000.0, granularity: 40}
+-- generateAxis _ =  ShearNormalModel {shearStress: [1.0,2.0], normalStress:[1.0, 2.0]} -- todo generate the rest here
