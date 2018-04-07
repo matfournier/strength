@@ -18,7 +18,7 @@ showMC :: MohrColoumbModel -> String
 showMC (MohrColoumbModel mc) = show mc.phi <> " " <> show mc.cohesion
 
 showSN :: ShearNormalModel -> String
-showSN (ShearNormalModel sn) = show sn.shearStress <> " " <> show sn.normalStress 
+showSN (ShearNormalModel sn) = show sn.normalStress <> " " <> show sn.shearStress 
 
 exMCModel :: Model
 exMCModel = MC "testMC" exMC 

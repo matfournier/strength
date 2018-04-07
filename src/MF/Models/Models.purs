@@ -10,8 +10,6 @@ import Data.Tuple (Tuple(..), fst, snd)
 
 -- | Generic aliasing
 
-type UCS = Number -- Unconfined Compressive Strength 
-type GSI = Number -- GS 
 type ModelName = String
 
 -- | Models
@@ -21,7 +19,7 @@ newtype MohrColoumbModel = MohrColoumbModel {phi :: Deg, cohesion :: Number}
 
 newtype FrictionalStrengthModel = FrictionalStrength {phi :: Deg}
 
-newtype ShearNormalModel = ShearNormalModel { shearStress :: Array Number, normalStress :: Array Number }
+newtype ShearNormalModel = ShearNormalModel { normalStress :: Array Number, shearStress :: Array Number }
 
 instance showShearNormalModel :: Show ShearNormalModel where
   show (ShearNormalModel m) = "shear stress: " <> show m.shearStress <> "\n" 
@@ -66,8 +64,8 @@ lepsPoor = SN "Leps - Poor" leps
   where
     leps :: ShearNormalModel
     leps = ShearNormalModel {
-      shearStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
-      normalStress: [4.4, 25.2, 40.9, 82.7, 224.1, 369.6, 508.3, 773.0, 2863.4, 3921.7]
+      normalStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
+      shearStress: [4.4, 25.2, 40.9, 82.7, 224.1, 369.6, 508.3, 773.0, 2863.4, 3921.7]
       }
 
 
@@ -76,8 +74,8 @@ lepsAvg = SN "Leps - Average" leps
   where
     leps :: ShearNormalModel
     leps = ShearNormalModel {
-      shearStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
-      normalStress: [5.4, 30.3, 49.1, 91.4, 269.3, 445.0, 612.8, 933.8, 3494.9, 4802.8]
+      normalStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
+      shearStress: [5.4, 30.3, 49.1, 91.4, 269.3, 445.0, 612.8, 933.8, 3494.9, 4802.8]
       }
 
 lepsGood :: Model
@@ -85,8 +83,8 @@ lepsGood = SN "Leps - Good" leps
   where
     leps :: ShearNormalModel
     leps = ShearNormalModel {
-      shearStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
-      normalStress: [6.5, 36.4, 58.9, 109.3, 321.1, 530.5, 730.6, 1114.1, 4189.7, 5763.8] 
+      normalStress: [3.4, 24.1, 41.4, 82.7, 275.8, 482.6, 689.5, 1103.20, 4826.30, 6894.80],
+      shearStress: [6.5, 36.4, 58.9, 109.3, 321.1, 530.5, 730.6, 1114.1, 4189.7, 5763.8] 
       }
 
 -- | Model Parameter Types
@@ -104,12 +102,12 @@ class ShearNormal model settings  where
 
 instance mcShearNormal :: ShearNormal MohrColoumbModel ShearNormalParameters where
   shearnormal (MohrColoumbModel mc) (ShearNormalParameters params) =
-    ShearNormalModel {shearStress: ss, normalStress: ns} 
+    ShearNormalModel {normalStress: ns, shearStress: ss} 
     where
-      ss :: Array Number 
-      ss = normalStressRange params.min params.max params.granularity
       ns :: Array Number 
-      ns = map (\s -> tan(deg2rad(mc.phi)) + mc.cohesion) ss  
+      ns = normalStressRange params.min params.max params.granularity
+      ss :: Array Number 
+      ss = ns # map (\s -> tan(deg2rad(mc.phi)) + mc.cohesion)   
 
 
 -- | todo move to util functions
@@ -118,10 +116,10 @@ normalStressRange min max granularity =
   let rangeStep =(max - min) / toNumber(granularity)
       in map (\v -> min + (toNumber(v) * rangeStep)) $ range 1 granularity
 
--- | todo add in the tensile strength (-ve normal stress) range 
+-- | todo add in the tensile strength (-ve normal stress) rang 
 instance hbShearNormal :: ShearNormal HoekBrownModel ShearNormalParameters where
-  shearnormal hb (ShearNormalParameters params) = ShearNormalModel {shearStress: fst stresses,
-                                                                    normalStress: snd stresses}
+  shearnormal hb (ShearNormalParameters params) = ShearNormalModel {normalStress: fst stresses,
+                                                                    shearStress: snd stresses}
     where
       s3range :: Array Number 
       s3range = normalStressRange params.min params.max params.granularity
@@ -171,8 +169,8 @@ hbTau s1' s3' ds1ds3 = (s1' - s3') * sqrt(ds1ds3) / (ds1ds3 + 1.0)
 -- calculate a shear normal stress pair for a given model and sigma 3 value
 
 hbGenerateShearNormal :: HoekBrownModel -> Number -> Tuple Number Number 
-hbGenerateShearNormal hb sig3' =   let sig1' = hbSigma1' hb sig3'
-                                       ds1ds3' = ds1ds3 hb sig1' sig3'
-                                       normalStress = hbNormal' sig1' sig3' ds1ds3'
-                                       shearStress = hbTau sig1' sig3' ds1ds3'
-                                   in Tuple normalStress shearStress 
+hbGenerateShearNormal hb sig3' = let sig1' = hbSigma1' hb sig3'
+                                     ds1ds3' = ds1ds3 hb sig1' sig3'
+                                     normalStress = hbNormal' sig1' sig3' ds1ds3'
+                                     shearStress = hbTau sig1' sig3' ds1ds3'
+                                 in Tuple normalStress shearStress 
