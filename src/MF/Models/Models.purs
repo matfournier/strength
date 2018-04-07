@@ -2,10 +2,11 @@ module Models where
 
 import Prelude
 
-import Data.Array (range)
+import Data.Array (range, unzip)
 import Data.Int (toNumber)
-import Degree (Deg, deg2rad, rad2deg, num2deg)
+import Degree (Deg, deg2rad, rad2deg)
 import Math (tan, asin, pow, sqrt, exp, e)
+import Data.Tuple (Tuple(..), fst, snd)
 
 -- | Generic aliasing
 
@@ -37,8 +38,8 @@ newtype HoekBrownModel = HoekBrownModel { inputs :: HoekBrown
                                         , mb :: Number
                                         , s :: Number
                                         , a :: Number
-                                        , rockmassUCS :: Number
-                                        , rockMassTensileStrength :: Number }
+                                        , ucs' :: Number
+                                        , t' :: Number }
 
 hoekBrownToMohrColoumb :: HoekBrownModel -> Number -> MohrColoumbModel
 hoekBrownToMohrColoumb (HoekBrownModel hb) sig3max = MohrColoumbModel {phi: rad2deg p, cohesion: c}
@@ -117,15 +118,14 @@ normalStressRange min max granularity =
   let rangeStep =(max - min) / toNumber(granularity)
       in map (\v -> min + (toNumber(v) * rangeStep)) $ range 1 granularity
 
--- instance hbShearNormal :: ShearNormal HoekBrownModel ShearNormalParameters where
---   shearnormal (HoekBrownModel hb) (ShearNormalParameters params) = ShearNormalModel {shearStress: ss, nomralStress: ns}
---     where
---       tensileRange :: Array Number
---       tensileRange = normalStressRange (-hb.rockMassTensileStrength) 0 30
---       s3range = normalStressRange params.min params.max params.granularity
---       s1 = map (\s3 -> s3 + hb.ucs * pow((hb.mb * s3 / hb.inputs.ucs) + hb.s)(hb.a)) s3range 
---       ds1s3 = map (\s3 -> 1 + (hb.a * hb.mb * pow((hb.mb * hb * s3 / hb.inputs.ucs) + hb.s)(hb.a - 1.0))) s3range
---      -- I need a zipWith3 here but it's not defined on arrays?
+instance hbShearNormal :: ShearNormal HoekBrownModel ShearNormalParameters where
+  shearnormal hb (ShearNormalParameters params) = ShearNormalModel {shearStress: fst stresses,
+                                                                    normalStress: snd stresses}
+    where
+      s3range :: Array Number 
+      s3range = normalStressRange params.min params.max params.granularity
+      stresses :: Tuple (Array Number) (Array Number)
+      stresses = s3range # map (\s3 -> hbGenerateShearNormal hb s3) # unzip 
 
 
 -- calculate the reduced value of the material constant mi 
@@ -144,22 +144,20 @@ a hb = 0.5 + (1.0 / 6.0) * (pow e (-hb.gsi / 15.0) ) - (pow e (-20.0 / 3.0))
 ucs' :: HoekBrown -> Number -> Number -> Number
 ucs' hb s a = hb.ucs * pow s a 
 
--- calculate sneile strength
+-- calculate tensile strength
 
 t' :: HoekBrown -> Number -> Number -> Number
 t' hb s mb = s * hb.ucs / mb
-
 
 -- calculated sigma1' 
 hbSigma1' :: HoekBrownModel -> Number -> Number
 hbSigma1' (HoekBrownModel hb) sig3' =
       sig3' + hb.inputs.ucs * pow((hb.mb * sig3' / hb.inputs.ucs) + hb.s)(hb.a)
 
-
 -- calculate d'sigma1' / d'sigma3'
 ds1ds3 :: HoekBrownModel -> Number -> Number -> Number
 ds1ds3 (HoekBrownModel hb) s1 s3 = 1.0 +
-                                   (hb.a * hb.mb * pow ((hb.mb * s3)/(hb.rockmassUCS + hb.s)) (hb.a - 1.0))
+                                   (hb.a * hb.mb * pow ((hb.mb * s3)/(hb.ucs' + hb.s)) (hb.a - 1.0))
 
 -- calculate  sigma normal'
 hbNormal' :: Number -> Number -> Number -> Number
@@ -168,3 +166,11 @@ hbNormal' s1' s3' ds1ds3 = ((s1' + s3') / 2.0) + ((s1' - s3') / 2.0) * ((ds1ds3 
 -- calculate tau shear stress
 hbTau :: Number -> Number -> Number -> Number
 hbTau s1' s3' ds1ds3 = (s1' - s3') * sqrt(ds1ds3) / (ds1ds3 + 1.0)
+
+
+hbGenerateShearNormal :: HoekBrownModel -> Number -> Tuple Number Number 
+hbGenerateShearNormal hb sig3' =   let sig1' = hbSigma1' hb sig3'
+                                       ds1ds3' = ds1ds3 hb sig1' sig3'
+                                       normalStress = hbNormal' sig1' sig3' ds1ds3'
+                                       shearStress = hbTau sig1' sig3' ds1ds3'
+                                   in Tuple normalStress shearStress 
