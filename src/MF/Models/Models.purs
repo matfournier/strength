@@ -118,6 +118,7 @@ normalStressRange min max granularity =
   let rangeStep =(max - min) / toNumber(granularity)
       in map (\v -> min + (toNumber(v) * rangeStep)) $ range 1 granularity
 
+-- | todo add in the tensile strength (-ve normal stress) range 
 instance hbShearNormal :: ShearNormal HoekBrownModel ShearNormalParameters where
   shearnormal hb (ShearNormalParameters params) = ShearNormalModel {shearStress: fst stresses,
                                                                     normalStress: snd stresses}
@@ -167,6 +168,7 @@ hbNormal' s1' s3' ds1ds3 = ((s1' + s3') / 2.0) + ((s1' - s3') / 2.0) * ((ds1ds3 
 hbTau :: Number -> Number -> Number -> Number
 hbTau s1' s3' ds1ds3 = (s1' - s3') * sqrt(ds1ds3) / (ds1ds3 + 1.0)
 
+-- calculate a shear normal stress pair for a given model and sigma 3 value
 
 hbGenerateShearNormal :: HoekBrownModel -> Number -> Tuple Number Number 
 hbGenerateShearNormal hb sig3' =   let sig1' = hbSigma1' hb sig3'
