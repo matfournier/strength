@@ -1,13 +1,14 @@
 module Models where
 
 import Prelude
+import Stress
 
 import Data.Array (range, unzip)
 import Data.Int (toNumber)
-import Degree (Deg, deg2rad, rad2deg)
-import Math (tan, asin, pow, sqrt, exp, e)
 import Data.Tuple (Tuple(..), fst, snd)
-import MF.Models.HoekBrown
+import Degree (Deg, deg2rad, rad2deg)
+import HoekBrown (HoekBrown(..), HoekBrownModel(..), hbGenerateShearNormal)
+import Math (tan, asin, pow, sqrt, exp, e)
 
 -- | Generic aliasing
 
